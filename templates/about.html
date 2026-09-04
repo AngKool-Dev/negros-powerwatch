@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - Negros PowerWatch</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+            <p class="subtitle">About</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>What is Negros PowerWatch?</h2>
+                <p>Negros PowerWatch is an independent, real-time electricity outage detection and alerting platform for Negros Oriental, Philippines.</p>
+                <p>We monitor actual power availability through multiple independent signals rather than relying exclusively on delayed official announcements.</p>
+            </section>
+
+            <section>
+                <h2>How It Works</h2>
+                <ol>
+                    <li>Community members report power outages</li>
+                    <li>Our system correlates multiple independent reports</li>
+                    <li>Outages are detected automatically without waiting for official announcements</li>
+                    <li>When official sources confirm, we attach that information</li>
+                    <li>Restoration is detected when reports indicate power has returned</li>
+                </ol>
+            </section>
+
+            <section>
+                <h2>Privacy</h2>
+                <p>We do not collect precise location data. Reports are anonymous and aggregated. No personal information is exposed on the public map.</p>
+            </section>
+
+            <section>
+                <h2>Not Affiliated With</h2>
+                <p>This project is independent and not affiliated with NORECO II, NGCP, or any government agency.</p>
+            </section>
+    </main>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
+
+    <footer>
+            <p>Negros PowerWatch &copy; 2026</p>
+        </footer>
+    </div>
+</body>
+</html>

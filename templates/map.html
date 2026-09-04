@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map - Negros PowerWatch</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/css/style.css">
+    <svg style="position: absolute; width: 0; height: 0;">
+      <defs>
+        <pattern id="outage-pattern" patternUnits="userSpaceOnUse" width="10" height="10">
+          <rect width="10" height="10" fill="rgba(239, 68, 68, 0.25)"/>
+          <path d="M-2,2 l4,-4 M0,10 l10,-10 M8,12 l4,-4" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round"/>
+        </pattern>
+        <pattern id="restoring-pattern" patternUnits="userSpaceOnUse" width="10" height="10">
+          <rect width="10" height="10" fill="rgba(59, 130, 246, 0.25)"/>
+          <path d="M-2,2 l4,-4 M0,10 l10,-10 M8,12 l4,-4" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
+        </pattern>
+      </defs>
+    </svg>
+    <style>
+        #map { height: 600px; border-radius: 8px; }
+        .legend {
+            background: var(--bg-card);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .legend-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 2px solid #475569;
+        }
+        .legend-swatch.slashes {
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(239, 68, 68, 0.7),
+                rgba(239, 68, 68, 0.7) 2px,
+                rgba(239, 68, 68, 0.2) 2px,
+                rgba(239, 68, 68, 0.2) 6px
+            ) !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+            <p class="subtitle">Live Outage Map - Negros Oriental</p>
+        </header>
+
+        <main>
+            <div class="legend">
+                <strong>Legend</strong>
+                <div class="legend-item">
+                    <div class="legend-swatch" style="background: rgba(239, 68, 68, 0.5); border-color: #dc2626;"></div>
+                    <span>Confirmed Outage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-swatch" style="background: rgba(249, 115, 22, 0.5); border-color: #f97316;"></div>
+                    <span>Detected</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-swatch" style="background: rgba(234, 179, 8, 0.5); border-color: #eab308;"></div>
+                    <span>Possible</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-swatch" style="background: rgba(59, 130, 246, 0.5); border-color: #3b82f6;"></div>
+                    <span>Restoring</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-swatch" style="background: rgba(148, 163, 184, 0.15); border-color: #475569;"></div>
+                    <span>Normal</span>
+                </div>
+            </div>
+            <div id="map"></div>
+        </main>
+
+        <footer>
+            <p>Negros PowerWatch &copy; 2026</p>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+     <script type="module">
+        import { formatPHT, formatPHTTime } from '/static/js/timezone.js';
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+
+        const API_BASE = '/api/v1';
+
+        const statusColors = {
+            possible: { fill: 'rgba(234, 179, 8, 0.25)', stroke: '#eab308' },
+            detected: { fill: 'rgba(249, 115, 22, 0.3)', stroke: '#f97316' },
+            community_confirmed: { fill: 'rgba(239, 68, 68, 0.35)', stroke: '#dc2626' },
+            officially_confirmed: { fill: 'rgba(239, 68, 68, 0.4)', stroke: '#dc2626' },
+            restoring: { fill: 'rgba(59, 130, 246, 0.3)', stroke: '#3b82f6' },
+            restored: { fill: 'rgba(148, 163, 184, 0.08)', stroke: '#475569' }
+        };
+
+        const statusLabels = {
+            possible: 'Possible Outage',
+            detected: 'Outage Detected',
+            community_confirmed: 'Community Confirmed',
+            officially_confirmed: 'Officially Confirmed',
+            restoring: 'Restoring',
+            restored: 'Restored'
+        };
+
+        const map = L.map('map').setView([9.75, 123.15], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        function injectOutagePatterns() {
+            const svg = document.querySelector('#map svg');
+            if (!svg || svg.querySelector('#outage-pattern')) return;
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <pattern id="outage-pattern" patternUnits="userSpaceOnUse" width="10" height="10">
+                  <rect width="10" height="10" fill="rgba(239, 68, 68, 0.25)"/>
+                  <path d="M-2,2 l4,-4 M0,10 l10,-10 M8,12 l4,-4" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round"/>
+                </pattern>
+                <pattern id="restoring-pattern" patternUnits="userSpaceOnUse" width="10" height="10">
+                  <rect width="10" height="10" fill="rgba(59, 130, 246, 0.25)"/>
+                  <path d="M-2,2 l4,-4 M0,10 l10,-10 M8,12 l4,-4" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
+                </pattern>
+            `;
+            svg.insertBefore(defs, svg.firstChild);
+        }
+
+        let municipalityLayer = null;
+        let outageMarkerLayer = null;
+        let reportLayer = null;
+
+        async function loadMap() {
+            try {
+                const [areasRes, outagesRes, reportsRes] = await Promise.all([
+                    fetch('/static/geojson/municipalities.geojson'),
+                    fetch(`${API_BASE}/map/status`),
+                    fetch(`${API_BASE}/map/reports`)
+                ]);
+
+                const municipalities = await areasRes.json();
+                const outageAreas = await outagesRes.json();
+                const reports = await reportsRes.json();
+
+                if (municipalityLayer) map.removeLayer(municipalityLayer);
+                if (outageMarkerLayer) map.removeLayer(outageMarkerLayer);
+                if (reportLayer) map.removeLayer(reportLayer);
+
+                injectOutagePatterns();
+
+                const outageAreaMap = new Map(outageAreas.map(a => [a.area_name, a]));
+
+                municipalityLayer = L.geoJSON(municipalities, {
+                    style: function(feature) {
+                        const name = feature.properties.name;
+                        const outage = outageAreaMap.get(name);
+                        if (outage && statusColors[outage.status]) {
+                            const c = statusColors[outage.status];
+                            const patternId = outage.status === 'restoring' ? 'url(#restoring-pattern)' : 'url(#outage-pattern)';
+                            return {
+                                fillColor: patternId,
+                                fillOpacity: 1,
+                                weight: 2,
+                                opacity: 0.8,
+                                color: c.stroke,
+                                dashArray: outage.status === 'restoring' ? '5, 5' : null
+                            };
+                        }
+                        return {
+                            fillColor: 'rgba(148, 163, 184, 0.05)',
+                            weight: 1,
+                            opacity: 0.25,
+                            color: '#64748b',
+                            fillOpacity: 0.05
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const name = feature.properties.name;
+                        const outage = outageAreaMap.get(name);
+                        let popup = `<strong>${name}</strong><br>${feature.properties.area_type}`;
+                        if (outage) {
+                            popup += `<br><br><strong>${statusLabels[outage.status] || outage.status}</strong>`;
+                            popup += `<br>Confidence: ${Math.round((outage.confidence || 0) * 100)}%`;
+                            popup += `<br>Reports: ${outage.report_count || 0}`;
+                            popup += `<br>Started: ${formatPHT(outage.started_at)}`;
+                            if (outage.restored_at) {
+                                popup += `<br>Restored: ${formatPHT(outage.restored_at)}`;
+                            }
+                        }
+                        layer.bindPopup(popup);
+                    }
+                }).addTo(map);
+
+                const outageMarkers = [];
+                for (const outage of outageAreas) {
+                    const feature = municipalities.features.find(f => f.properties.name === outage.area_name);
+                    if (feature && feature.properties.center) {
+                        const [lat, lng] = feature.properties.center;
+                        const color = statusColors[outage.status] ? statusColors[outage.status].stroke : '#dc2626';
+                        const marker = L.circleMarker([lat, lng], {
+                            radius: 10,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.9
+                        });
+                        marker.bindPopup(`
+                            <strong>${outage.area_name}</strong><br>
+                            <strong>${statusLabels[outage.status] || outage.status}</strong><br>
+                            Confidence: ${Math.round((outage.confidence || 0) * 100)}%<br>
+                            Reports: ${outage.report_count || 0}<br>
+                            Started: ${formatPHT(outage.started_at)}<br>
+                            ${outage.restored_at ? `Restored: ${formatPHT(outage.restored_at)}` : ''}
+                        `);
+                        outageMarkers.push(marker);
+                    }
+                }
+
+                if (outageMarkers.length > 0) {
+                    outageMarkerLayer = L.featureGroup(outageMarkers).addTo(map);
+                }
+
+                const reportMarkers = [];
+                for (const report of reports) {
+                    if (report.latitude && report.longitude) {
+                        const marker = L.circleMarker([report.latitude, report.longitude], {
+                            radius: 6,
+                            fillColor: '#dc2626',
+                            color: '#7f1d1d',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.9
+                        });
+
+                        marker.bindPopup(`
+                            <strong>Community Report</strong><br>
+                            Status: Power Out<br>
+                            Location: ${report.municipality || 'Unknown'}<br>
+                            Time: ${formatPHT(report.timestamp)}
+                        `);
+
+                        reportMarkers.push(marker);
+                    }
+                }
+
+                if (reportMarkers.length > 0) {
+                    reportLayer = L.featureGroup(reportMarkers).addTo(map);
+                }
+
+                const bounds = L.latLngBounds([]);
+                bounds.extend(municipalityLayer.getBounds());
+                if (outageMarkerLayer) bounds.extend(outageMarkerLayer.getBounds());
+                if (reportLayer) bounds.extend(reportLayer.getBounds());
+
+                map.fitBounds(bounds.pad(0.1));
+
+            } catch (error) {
+                console.error('Failed to load map data:', error);
+            }
+        }
+
+        loadMap();
+        setInterval(loadMap, 30000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outage Detail - Negros PowerWatch</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+            <p class="subtitle">Outage Detail</p>
+        </header>
+
+        <main>
+            <div id="outage-detail">
+                <p>Loading outage details...</p>
+            </div>
+        </main>
+
+    <footer>
+        <p>Negros PowerWatch &copy; 2026</p>
+    </footer>
+    </div>
+
+    <script type="module">
+        import { formatPHTDateTime } from '/static/js/timezone.js';
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+
+        const API_BASE = '/api/v1';
+        const outageId = window.location.pathname.split('/').pop();
+
+        async function loadOutageDetail() {
+            try {
+                const response = await fetch(`${API_BASE}/outages/${outageId}`);
+                if (!response.ok) {
+                    document.getElementById('outage-detail').innerHTML = '<p>Outage not found.</p>';
+                    return;
+                }
+                const outage = await response.json();
+                const container = document.getElementById('outage-detail');
+
+                const areas = outage.areas.map(a => a.area ? a.area.name : 'Unknown').join(', ');
+
+                container.innerHTML = `
+                    <div class="outage-card">
+                        <div class="outage-header">
+                            <span class="outage-status ${outage.status}">${formatStatus(outage.status)}</span>
+                            <span class="outage-confidence">${Math.round(outage.confidence * 100)}% confidence</span>
+                        </div>
+                        <div class="outage-detail-grid">
+                            <div class="detail-item">
+                                <label>Areas Affected</label>
+                                <span>${areas}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Started</label>
+                                <span>${outage.started_at ? formatPHTDateTime(outage.started_at) : 'Unknown'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>First Detected</label>
+                                <span>${outage.first_signal_at ? formatPHTDateTime(outage.first_signal_at) : 'Unknown'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Official Confirmed</label>
+                                <span>${outage.official_confirmed_at ? formatPHTDateTime(outage.official_confirmed_at) : 'Not yet available'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Restored</label>
+                                <span>${outage.restored_at ? formatPHTDateTime(outage.restored_at) : 'Not yet restored'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Community Reports</label>
+                                <span>${outage.report_count}</span>
+                            </div>
+                            ${outage.cause ? `
+                            <div class="detail-item">
+                                <label>Cause</label>
+                                <span>${outage.cause}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('outage-detail').innerHTML = '<p>Error loading outage details.</p>';
+            }
+        }
+
+        function formatStatus(status) {
+            const map = {
+                'possible': 'Possible', 'detected': 'Detected',
+                'community_confirmed': 'Community Confirmed', 'officially_confirmed': 'Officially Confirmed',
+                'restoring': 'Restoring', 'restored': 'Restored', 'closed': 'Closed', 'false_positive': 'False Positive'
+            };
+            return map[status] || status;
+        }
+
+        loadOutageDetail();
+    </script>
+</body>
+</html>

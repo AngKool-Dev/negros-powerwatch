@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report - Negros PowerWatch</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+            <p class="subtitle">Report Power Status</p>
+        </header>
+
+        <main>
+            <div class="report-options">
+                <p>Is your power out?</p>
+                <button class="btn btn-danger btn-large" onclick="submitReport('off')">Yes, Power Is Out</button>
+                <button class="btn btn-success btn-large" onclick="submitReport('restored')">No, Power Is Back</button>
+            </div>
+
+            <div id="report-result" class="report-result" style="display: none;">
+                <p id="result-message"></p>
+            </div>
+
+            <div class="report-form" id="report-form" style="display: none;">
+                <h3>Optional Details</h3>
+                <form id="details-form">
+                    <div class="form-group">
+                        <label for="municipality">Municipality/City</label>
+                        <input type="text" id="municipality" name="municipality" placeholder="e.g., Siaton">
+                    </div>
+                    <div class="form-group">
+                        <label for="barangay">Barangay</label>
+                        <input type="text" id="barangay" name="barangay" placeholder="e.g., Poblacion">
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" name="notes" rows="3" placeholder="Any additional details (optional)"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit Report</button>
+                </form>
+            </div>
+        </main>
+
+    <footer>
+        <p>Negros PowerWatch &copy; 2026</p>
+    </footer>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+        let currentStatus = '';
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+
+        async function submitReport(status) {
+            currentStatus = status;
+            document.getElementById('report-form').style.display = 'block';
+            document.getElementById('details-form').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        document.getElementById('details-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                power_status: currentStatus,
+                municipality: formData.get('municipality'),
+                barangay: formData.get('barangay'),
+                notes: formData.get('notes'),
+                session_id: getSessionId()
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/reports`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                const resultDiv = document.getElementById('report-result');
+                const msg = document.getElementById('result-message');
+
+                if (response.ok) {
+                    msg.innerHTML = `<strong>Report submitted!</strong> Thank you for helping the community.`;
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = 'report-result success';
+                    document.getElementById('report-form').style.display = 'none';
+                } else {
+                    msg.innerHTML = `<strong>Error:</strong> ${result.detail || 'Please try again.'}`;
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = 'report-result error';
+                }
+            } catch (error) {
+                document.getElementById('result-message').textContent = 'Network error. Please try again.';
+                document.getElementById('report-result').style.display = 'block';
+                document.getElementById('report-result').className = 'report-result error';
+            }
+        });
+
+        function getSessionId() {
+            let id = localStorage.getItem('npw_session');
+            if (!id) {
+                id = 'session-' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('npw_session', id);
+            }
+            return id;
+        }
+    </script>
+</body>
+</html>

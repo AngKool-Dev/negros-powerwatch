@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Negros PowerWatch</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f172a">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ Negros PowerWatch</h1>
+            <p class="subtitle">Real-time outage detection for Negros Oriental</p>
+        </header>
+
+        <main>
+            <section class="status-card" id="status-card">
+                <div class="status-indicator" id="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text" id="status-text">Loading...</span>
+                </div>
+                <div class="status-details" id="status-details">
+                    <p class="last-updated" id="last-updated">Last updated: --</p>
+                </div>
+            </section>
+
+            <section class="outages-section" id="outages-section" style="display: none;">
+                <h2>Active Outages</h2>
+                <div id="outages-list"></div>
+            </section>
+
+            <section class="actions">
+                <a href="/report" class="btn btn-primary">Report Power Status</a>
+                <a href="/map" class="btn btn-secondary">View Map</a>
+            </section>
+
+            <section class="info">
+                <p>This is an independent community-powered outage tracker. Not affiliated with NORECO II or NGCP.</p>
+            </section>
+        </main>
+
+        <footer>
+            <p>Negros PowerWatch &copy; 2026</p>
+        </footer>
+    </div>
+
+    <script type="module">
+        import { formatPHT, formatPHTTime } from '/static/js/timezone.js';
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+
+        const API_BASE = '/api/v1';
+        const eventSource = new EventSource(`${API_BASE}/events`);
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            updateStatus(data);
+        };
+
+        eventSource.onerror = function() {
+            document.getElementById('status-text').textContent = 'Connection lost. Retrying...';
+            document.getElementById('status-indicator').className = 'status-indicator degraded';
+        };
+
+        async function updateStatus(data) {
+            const indicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            const lastUpdated = document.getElementById('last-updated');
+            const outagesSection = document.getElementById('outages-section');
+            const outagesList = document.getElementById('outages-list');
+
+            lastUpdated.textContent = `Last updated: ${formatPHT(data.last_updated)}`;
+
+            if (data.active_outages === 0) {
+                indicator.className = 'status-indicator normal';
+                statusText.textContent = 'All Systems Normal';
+                outagesSection.style.display = 'none';
+            } else {
+                indicator.className = 'status-indicator outage';
+                statusText.textContent = `${data.active_outages} Active Outage${data.active_outages > 1 ? 's' : ''}`;
+                outagesSection.style.display = 'block';
+
+                outagesList.innerHTML = '';
+                for (const outage of data.outages) {
+                    const card = document.createElement('div');
+                    card.className = 'outage-card';
+                    let areasText = 'Unknown';
+                    if (outage.areas && outage.areas.length > 0) {
+                        areasText = outage.areas.map(a => a.area ? a.area.name : 'Unknown').join(', ');
+                    } else if (outage.report_count > 0) {
+                        areasText = `${outage.report_count} community report${outage.report_count > 1 ? 's' : ''}`;
+                    }
+                    card.innerHTML = `
+                        <div class="outage-header">
+                            <span class="outage-status ${outage.status}">${formatStatus(outage.status)}</span>
+                            <span class="outage-confidence">${Math.round(outage.confidence * 100)}% confidence</span>
+                        </div>
+                        <div class="outage-areas">${areasText}</div>
+                        <div class="outage-meta">
+                            ${outage.started_at ? `Started: ${formatPHTTime(outage.started_at)}` : ''}
+                            ${outage.report_count > 0 ? ` | ${outage.report_count} reports` : ''}
+                        </div>
+                    `;
+                    card.addEventListener('click', () => {
+                        window.location.href = `/outages/${outage.id}`;
+                    });
+                    outagesList.appendChild(card);
+                }
+            }
+        }
+
+        function formatStatus(status) {
+            const map = {
+                'possible': 'Possible',
+                'detected': 'Detected',
+                'community_confirmed': 'Community Confirmed',
+                'officially_confirmed': 'Officially Confirmed',
+                'restoring': 'Restoring',
+                'restored': 'Restored',
+                'closed': 'Closed',
+                'false_positive': 'False Positive'
+            };
+            return map[status] || status;
+        }
+
+        async function loadInitialStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                updateStatus(data);
+            } catch (error) {
+                document.getElementById('status-text').textContent = 'Error loading status';
+            }
+        }
+
+        loadInitialStatus();
+    </script>
+</body>
+</html>
