@@ -1,0 +1,8 @@
+{
+  "name": "negros-powerwatch-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "bash build_frontend.sh"
+  }
+}
