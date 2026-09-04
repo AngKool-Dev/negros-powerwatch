@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: negros-powerwatch-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/status
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: negros-powerwatch-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FACEBOOK_ACCESS_TOKEN
+        sync: false
+      - key: FACEBOOK_SOURCES
+        sync: false
+      - key: FACEBOOK_ENABLED
+        value: true
+
+databases:
+  - name: negros-powerwatch-db
+    plan: free
+    databaseName: powerwatch
