@@ -163,7 +163,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
   if (path === "/api/v1/map/reports" && method === "GET") {
     const stmt = env.DB.prepare(
-      "SELECT id, latitude, longitude, timestamp, area_id, municipality, barangay FROM community_reports WHERE power_status = 'out'"
+      "SELECT id, latitude, longitude, timestamp, area_id, municipality, barangay FROM community_reports WHERE power_status IN ('out', 'off')"
     );
     const { results } = await stmt.all();
     return jsonResponse(results);
