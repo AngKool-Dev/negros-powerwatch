@@ -48,10 +48,17 @@ export class ReportService {
     }
 
     let areaId = reportData.area_id || null;
+    let areaLat = reportData.latitude ?? null;
+    let areaLng = reportData.longitude ?? null;
+
     if (!areaId && reportData.municipality) {
-      const areaStmt = this.db.prepare("SELECT id FROM geographic_areas WHERE name LIKE ? AND area_type = 'municipality' LIMIT 1");
+      const areaStmt = this.db.prepare("SELECT id, latitude, longitude FROM geographic_areas WHERE name LIKE ? AND area_type = 'municipality' LIMIT 1");
       const area = await areaStmt.bind(`%${reportData.municipality}%`).first();
-      areaId = area?.id || null;
+      if (area) {
+        areaId = area.id as string;
+        if (areaLat === null) areaLat = area.latitude as number | null;
+        if (areaLng === null) areaLng = area.longitude as number | null;
+      }
     }
 
     const report: CommunityReport = {
@@ -59,8 +66,8 @@ export class ReportService {
       outage_id: null,
       session_id: sessionId,
       timestamp: utcNow(),
-      latitude: reportData.latitude ?? null,
-      longitude: reportData.longitude ?? null,
+      latitude: areaLat,
+      longitude: areaLng,
       area_id: areaId,
       power_status: reportData.power_status || "unknown",
       municipality: reportData.municipality || null,

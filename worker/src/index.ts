@@ -16,20 +16,31 @@ async function ensureInitialized(db: D1Database): Promise<void> {
   if ((areasCount as any).cnt === 0) {
     const areas = [
       ["Negros Oriental", "province", null, 9.8, 123.5],
-      ["Siaton", "municipality", "Negros Oriental", 9.65, 123.15],
-      ["Zamboanguita", "municipality", "Negros Oriental", 9.1, 123.2],
-      ["Bayawan", "city", "Negros Oriental", 9.35, 122.8],
-      ["Dumaguete", "city", "Negros Oriental", 9.3, 123.3],
-      ["Bacong", "municipality", "Negros Oriental", 9.25, 123.3],
-      ["Valencia", "municipality", "Negros Oriental", 9.25, 123.55],
-      ["Dauin", "municipality", "Negros Oriental", 9.2, 123.35],
-      ["Santa Catalina", "municipality", "Negros Oriental", 9.25, 123.1],
-      ["Ayungon", "municipality", "Negros Oriental", 9.4, 123.2],
-      ["Mabinay", "municipality", "Negros Oriental", 9.7, 123.1],
-      ["Bindoy", "municipality", "Negros Oriental", 9.75, 123.1],
-      ["Manjuyod", "municipality", "Negros Oriental", 9.65, 123.15],
-      ["Pamplona", "municipality", "Negros Oriental", 9.55, 123.1],
-      ["Tanjay", "city", "Negros Oriental", 9.5, 123.15],
+      ["Amlan", "municipality", "Negros Oriental", 9.43154627980005, 123.18694893990009],
+      ["Ayungon", "municipality", "Negros Oriental", 9.839607289571477, 123.08480007276196],
+      ["Bacong", "municipality", "Negros Oriental", 9.250654493142909, 123.25088552128577],
+      ["Basay", "municipality", "Negros Oriental", 9.444160756562553, 122.68098230068756],
+      ["Bindoy", "municipality", "Negros Oriental", 9.767478086529453, 123.05830008617653],
+      ["Dauin", "municipality", "Negros Oriental", 10.003609847111168, 123.14548395633341],
+      ["Jimalalud", "municipality", "Negros Oriental", 10.003609847111168, 123.14548395633341],
+      ["La Libertad", "municipality", "Negros Oriental", 10.049564189333378, 123.18171494788895],
+      ["Mabinay", "municipality", "Negros Oriental", 9.71015535616005, 122.89972179920007],
+      ["Manjuyod", "municipality", "Negros Oriental", 9.70574848788466, 123.06353862407698],
+      ["Pamplona", "municipality", "Negros Oriental", 9.451031060272783, 123.05763238200007],
+      ["San Jose", "municipality", "Negros Oriental", 9.415967594375047, 123.21815643987509],
+      ["Santa Catalina", "municipality", "Negros Oriental", 9.311550231071482, 122.93805128525005],
+      ["Siaton", "municipality", "Negros Oriental", 9.133264176625053, 123.06675948196883],
+      ["Sibulan", "municipality", "Negros Oriental", 9.351796289000053, 123.16487132453852],
+      ["Tayasan", "municipality", "Negros Oriental", 9.92719729908338, 123.11337595400005],
+      ["Valencia", "municipality", "Negros Oriental", 9.29321756975005, 123.16792527241672],
+      ["Vallehermoso", "municipality", "Negros Oriental", 10.348514432000059, 123.29813926362505],
+      ["Zamboanguita", "municipality", "Negros Oriental", 9.172270659416725, 123.16590882383339],
+      ["Bais", "city", "Negros Oriental", 9.59891786337042, 123.09013551329636],
+      ["Bayawan", "city", "Negros Oriental", 9.526052842897485, 122.82501985394879],
+      ["Canlaon", "city", "Negros Oriental", 10.375112780142903, 123.20902604564291],
+      ["Dumaguete", "city", "Negros Oriental", 9.306345957333386, 123.29194476100007],
+      ["Guihulngan", "city", "Negros Oriental", 10.231864835800055, 123.2556808341334],
+      ["Tanjay", "city", "Negros Oriental", 9.506537643757625, 123.1123716034849],
     ];
     for (const [name, area_type, parent_name, lat, lon] of areas) {
       const id = generateId();
@@ -152,7 +163,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
   if (path === "/api/v1/map/reports" && method === "GET") {
     const stmt = env.DB.prepare(
-      "SELECT id, latitude, longitude, timestamp, area_id, municipality, barangay FROM community_reports WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND power_status = 'out'"
+      "SELECT id, latitude, longitude, timestamp, area_id, municipality, barangay FROM community_reports WHERE power_status = 'out'"
     );
     const { results } = await stmt.all();
     return jsonResponse(results);
