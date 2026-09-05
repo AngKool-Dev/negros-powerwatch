@@ -127,6 +127,7 @@ export function detectLocation(text: string): { area: string | null; barangay: s
 }
 
 export async function fetchFacebookSignals(db: D1Database): Promise<{ signals: Signal[]; results: Record<string, { signalsFound: number; status: string }> }> {
+  const useMock = (globalThis as any).FACEBOOK_MOCK === 'true';
   const sources = getFacebookSources();
   const results: Record<string, { signalsFound: number; status: string }> = {};
   let totalSignals = 0;
