@@ -220,7 +220,7 @@ export async function fetchFacebookSignals(db: D1Database): Promise<{ signals: S
           source_name: sourceName,
         };
 
-        const existing = await existingSignalStmt.bind(sourceId, `%"source_id": "${post.id || ""}"`).first();
+        const existing = await existingSignalStmt.bind(sourceId, `%"source_id":"${post.id || ""}"%`).first();
         if (existing) continue;
 
         const confidence = Math.min(0.95, Math.max(0.2, score / 15));

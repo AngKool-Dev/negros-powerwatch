@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Admin - Negros PowerWatch</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+            <p class="subtitle">Facebook Integration Admin</p>
+        </header>
+
+        <div class="glass-card">
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Connected Page</h2>
+            
+            <div class="detail-item">
+                <label>Page Name</label>
+                <span id="page-name">Loading...</span>
+            </div>
+            
+            <div class="detail-item">
+                <label>Page ID</label>
+                <span id="page-id">Loading...</span>
+            </div>
+            
+            <div class="detail-item">
+                <label>Status</label>
+                <span id="page-status">Loading...</span>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+                <a href="/auth/facebook/disconnect" class="btn btn-danger">Disconnect Facebook</a>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Data Source Settings</h2>
+            
+            <div class="detail-item">
+                <label>Mock Mode</label>
+                <span id="mock-status">Checking...</span>
+            </div>
+            
+            <div class="detail-item">
+                <label>Poll Interval</label>
+                <span>1 minute</span>
+            </div>
+            
+            <div class="detail-item">
+                <label>Last Scan</label>
+                <span id="last-scan">Never</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/config.js?v=2"></script>
+    <script type="module">
+        const API_BASE = window.POWERWATCH_CONFIG?.API_BASE || '/api/v1';
+
+        async function loadStatus() {
+            try {
+                const [fbStatus, status] = await Promise.all([
+                    fetch(`${API_BASE}/admin/facebook/status`),
+                    fetch(`${API_BASE}/status`)
+                ]);
+
+                if (fbStatus.ok) {
+                    const fb = await fbStatus.json();
+                    document.getElementById('page-name').textContent = 'Not connected';
+                    document.getElementById('page-id').textContent = '-';
+                    document.getElementById('page-status').textContent = fb.health ? 'Healthy' : 'Not configured';
+                }
+
+                if (status.ok) {
+                    const data = await status.json();
+                    document.getElementById('last-scan').textContent = data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Never';
+                }
+            } catch (error) {
+                console.error('Failed to load status:', error);
+            }
+        }
+
+        loadStatus();
+        setInterval(loadStatus, 30000);
+    </script>
+</body>
+</html>

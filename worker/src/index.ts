@@ -220,6 +220,114 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     });
   }
 
+  if (path === "/auth/facebook" && method === "GET") {
+    const appId = (env as any).FACEBOOK_APP_ID || "1608618164211971";
+    const redirectUri = `${url.origin}/auth/facebook/callback`;
+    const scope = "pages_read_engagement,pages_read_user_content";
+    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
+    return Response.redirect(authUrl, 302);
+  }
+
+  if (path === "/auth/facebook/callback" && method === "GET") {
+    const code = url.searchParams.get("code");
+    if (!code) {
+      return jsonResponse({ error: "Missing code" }, 400);
+    }
+
+    const appId = (env as any).FACEBOOK_APP_ID || "1608618164211971";
+    const appSecret = (env as any).FACEBOOK_APP_SECRET || "";
+    const redirectUri = `${url.origin}/auth/facebook/callback`;
+
+    const tokenRes = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${appSecret}&code=${code}`, { method: "GET" });
+    const tokenData = await tokenRes.json();
+    if (!tokenRes.ok || !tokenData.access_token) {
+      return jsonResponse({ error: "Failed to get access token", details: tokenData }, 400);
+    }
+
+    const userRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${tokenData.access_token}`);
+    const userData = await userRes.json();
+    if (!userRes.ok || !userData.id) {
+      return jsonResponse({ error: "Failed to get user info", details: userData }, 400);
+    }
+
+    const userId = String(userData.id);
+    const allowedUserId = (env as any).FACEBOOK_ALLOWED_USER_ID;
+
+    if (!allowedUserId) {
+      await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind("facebook_allowed_user_id", userId).run();
+    } else if (allowedUserId !== userId) {
+      return jsonResponse({ error: "Not authorized. This app is restricted to another user." }, 403);
+    }
+
+    const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${tokenData.access_token}`);
+    const pagesData = await pagesRes.json();
+    const pages = pagesData.data || [];
+
+    const page = pages[0];
+    if (!page) {
+      return jsonResponse({ error: "No pages found. Please create or manage a Facebook page." }, 400);
+    }
+
+    await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
+      .bind("facebook_page_access_token", page.access_token)
+      .run();
+    await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
+      .bind("facebook_page_id", page.id)
+      .run();
+    await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
+      .bind("facebook_page_name", page.name)
+      .run();
+
+    const response = new Response(null, { status: 302, headers: { Location: "/admin/facebook", "Set-Cookie": `npw_fb_user=${userId}; Path=/; HttpOnly; Max-Age=86400` } });
+    return response;
+  }
+
+  if (path === "/admin/facebook" && method === "GET") {
+    const cookie = request.headers.get("cookie") || "";
+    const match = cookie.match(/npw_fb_user=([^;]+)/);
+    const sessionUserId = match ? match[1] : null;
+    const allowedUserId = (env as any).FACEBOOK_ALLOWED_USER_ID;
+
+    if (!sessionUserId || (allowedUserId && allowedUserId !== sessionUserId)) {
+      return Response.redirect("/auth/facebook", 302);
+    }
+
+    const pageIdRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_id'").first();
+    const pageNameRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_name'").first();
+    const pageTokenRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_access_token'").first();
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Facebook Admin - Negros PowerWatch</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+      <p class="subtitle">Facebook Integration Admin</p>
+    </header>
+    <div class="glass-card">
+      <h2>Connected Page</h2>
+      <div class="detail-item"><label>Page Name</label><span>${pageNameRow?.value || "Not connected"}</span></div>
+      <div class="detail-item"><label>Page ID</label><span>${pageIdRow?.value || "Not connected"}</span></div>
+      <div class="detail-item"><label>Status</label><span>${pageTokenRow?.value ? "Connected" : "Not connected"}</span></div>
+      ${pageTokenRow?.value ? `<a href="/auth/facebook/disconnect" class="btn btn-danger" style="margin-top: 1rem;">Disconnect</a>` : `<a href="/auth/facebook" class="btn btn-primary" style="margin-top: 1rem;">Connect Facebook</a>`}
+    </div>
+  </div>
+</body>
+</html>`;
+
+    return new Response(html, { headers: { "Content-Type": "text/html" } });
+  }
+
+  if (path === "/auth/facebook/disconnect" && method === "GET") {
+    await env.DB.prepare("DELETE FROM settings WHERE key IN ('facebook_page_access_token', 'facebook_page_id', 'facebook_page_name')").run();
+    const response = new Response(null, { status: 302, headers: { Location: "/admin/facebook", "Set-Cookie": "npw_fb_user=; Path=/; HttpOnly; Max-Age=0" } });
+    return response;
+  }
+
   return new Response("Not Found", { status: 404, headers: corsHeaders });
 }
 
