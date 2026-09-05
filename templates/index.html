@@ -54,20 +54,48 @@
         }
 
         const API_BASE = window.POWERWATCH_CONFIG?.API_BASE || '/api/v1';
-        const eventSource = new EventSource(`${API_BASE}/events`);
+        let eventSource = null;
+        let pollInterval = null;
 
-        eventSource.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            updateStatus(data);
-        };
-
-        eventSource.onerror = function() {
-            const statusText = document.getElementById('status-text');
-            if (statusText && statusText.textContent === 'Loading...') {
-                statusText.textContent = 'No backend connected';
-                document.getElementById('status-indicator').className = 'status-indicator degraded';
+        function startSSE() {
+            if (eventSource) {
+                eventSource.close();
             }
-        };
+            eventSource = new EventSource(`${API_BASE}/events`);
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateStatus(data);
+            };
+
+            eventSource.onerror = function() {
+                console.warn('SSE connection failed, falling back to polling');
+                eventSource.close();
+                eventSource = null;
+                startPolling();
+            };
+        }
+
+        function startPolling() {
+            if (pollInterval) return;
+            loadInitialStatus();
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/status`);
+                    const data = await response.json();
+                    updateStatus(data);
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 5000);
+        }
+
+        if (window.EventSource === undefined) {
+            console.warn('EventSource not supported, using polling');
+            startPolling();
+        } else {
+            startSSE();
+        }
 
         async function updateStatus(data) {
             const indicator = document.getElementById('status-indicator');

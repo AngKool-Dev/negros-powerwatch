@@ -1,9 +1,10 @@
 const CACHE_NAME = 'negros-powerwatch-v1';
 const STATIC_ASSETS = [
     '/',
-    '/static/css/style.css',
-    '/static/js/timezone.js',
-    '/static/manifest.json',
+    '/css/style.css',
+    '/js/timezone.js',
+    '/manifest.json',
+    '/sw.js',
 ];
 
 self.addEventListener('install', (event) => {
@@ -25,6 +26,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     if (request.method !== 'GET') return;
+
+    const url = new URL(request.url);
+
+    if (url.pathname.startsWith('/api/')) {
+        event.respondWith(fetch(request));
+        return;
+    }
 
     event.respondWith(
         caches.match(request).then((cached) => {
