@@ -334,11 +334,6 @@ export class OutageEngine {
       await this.updateOutage(outage);
     }
 
-    const sigStmt = this.db.prepare(
-      "INSERT INTO signals (id, outage_id, source_id, signal_type, timestamp, latitude, longitude, area_id, status, confidence, metadata_json, processed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    );
-    await sigStmt.bind(signal.id, signal.outage_id, signal.source_id, signal.signal_type, signal.timestamp, signal.latitude, signal.longitude, signal.area_id, signal.status, signal.confidence, signal.metadata_json, signal.processed ? 1 : 0, signal.created_at).run();
-
     return outage;
   }
 

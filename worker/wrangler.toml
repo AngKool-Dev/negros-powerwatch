@@ -12,3 +12,8 @@ crons = ["*/1 * * * *"]
 
 [vars]
 APP_NAME = "Negros PowerWatch"
+FACEBOOK_ENABLED = "true"
+FACEBOOK_ACCESS_TOKEN = "mock-token"
+FACEBOOK_MOCK = "true"
+FACEBOOK_SOURCES = "[{\"name\":\"NORECO II\",\"page_id\":\"NORECO2Official\",\"enabled\":true},{\"name\":\"NGCP\",\"page_id\":\"NGCPph\",\"enabled\":true}]"
+FACEBOOK_POLL_INTERVAL_MINUTES = "1"

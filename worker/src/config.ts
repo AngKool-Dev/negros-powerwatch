@@ -20,7 +20,7 @@ export const CONFIG = {
     }
   },
   get facebookSourceNames(): string[] {
-    return this.facebookSources.map((s: any) => s.get("name") || s.get("page_id") || s.get("url") || "unknown");
+    return this.facebookSources.map((s: any) => (s.name || s.page_id || s.url || "unknown"));
   },
 };
 

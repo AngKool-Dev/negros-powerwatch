@@ -145,6 +145,9 @@ export class ReportService {
   async scanSources(): Promise<{ total_signals: number; providers: Record<string, { signals_found: number; status: string }> }> {
     await this.engine.ensureSources();
     const { signals, results } = await fetchFacebookSignals(this.db);
+    for (const signal of signals) {
+      await this.engine.processSignal(signal);
+    }
     broadcastEvent({
       type: "scan_complete",
       total_signals: signals.length,
