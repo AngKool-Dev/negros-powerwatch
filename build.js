@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const publicDir = '.';
+const publicDir = 'public';
 fs.mkdirSync(publicDir, { recursive: true });
 
-['../templates', '../static'].forEach(dir => {
+['templates', 'static'].forEach(dir => {
   const items = fs.readdirSync(dir);
   items.forEach(item => {
     const src = path.join(dir, item);
