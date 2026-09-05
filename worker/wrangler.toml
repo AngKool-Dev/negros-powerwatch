@@ -5,7 +5,7 @@ compatibility_date = "2025-01-15"
 [[d1_databases]]
 binding = "DB"
 database_name = "powerwatch-db"
-database_id = "powerwatch-db"
+database_id = "38142e93-f663-4ee3-b060-c11b009ecf35"
 
 [triggers]
 crons = ["*/1 * * * *"]

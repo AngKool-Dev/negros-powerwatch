@@ -9,10 +9,9 @@
     "db:local": "wrangler d1 execute powerwatch-db --local",
     "db:remote": "wrangler d1 execute powerwatch-db --remote"
   },
-  "dependencies": {},
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250101.0",
-    "wrangler": "^3.99.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "wrangler": "^4.129.0"
   }
 }
