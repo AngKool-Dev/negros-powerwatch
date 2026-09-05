@@ -249,6 +249,7 @@
 
             console.log('Municipality layer added, features:', municipalityLayer.getLayers().length);
 
+            try {
                 const outageMarkers = [];
                 for (const outage of outageAreas) {
                     const feature = municipalities.features.find(f => f.properties.name === outage.area_name);
