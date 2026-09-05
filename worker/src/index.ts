@@ -286,20 +286,40 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   }
 
   if (path === "/admin/facebook" && method === "GET") {
-    const cookie = request.headers.get("cookie") || "";
-    const match = cookie.match(/npw_fb_user=([^;]+)/);
-    const sessionUserId = match ? match[1] : null;
-    const allowedUserId = (env as any).FACEBOOK_ALLOWED_USER_ID;
+    try {
+      const cookie = request.headers.get("cookie") || "";
+      const match = cookie.match(/npw_fb_user=([^;]+)/);
+      const sessionUserId = match ? match[1] : null;
+      const allowedUserId = (env as any).FACEBOOK_ALLOWED_USER_ID;
 
-    if (!sessionUserId || (allowedUserId && allowedUserId !== sessionUserId)) {
-      return Response.redirect("/auth/facebook", 302);
-    }
+      if (!sessionUserId || (allowedUserId && allowedUserId !== sessionUserId)) {
+        const authUrl = new URL("/auth/facebook", url.origin);
+        return Response.redirect(authUrl.toString(), 302);
+      }
 
-    const pageIdRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_id'").first();
-    const pageNameRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_name'").first();
-    const pageTokenRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_access_token'").first();
+      let pageIdRow: any = null;
+      let pageNameRow: any = null;
+      let pageTokenRow: any = null;
 
-    const html = `<!DOCTYPE html>
+      try {
+        pageIdRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_id'").first();
+      } catch (e) {
+        console.error("Failed to query page_id:", e);
+      }
+
+      try {
+        pageNameRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_name'").first();
+      } catch (e) {
+        console.error("Failed to query page_name:", e);
+      }
+
+      try {
+        pageTokenRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_access_token'").first();
+      } catch (e) {
+        console.error("Failed to query page_token:", e);
+      }
+
+      const html = `<!DOCTYPE html>
 <html>
 <head>
   <title>Facebook Admin - Negros PowerWatch</title>
@@ -312,17 +332,36 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       <p class="subtitle">Facebook Integration Admin</p>
     </header>
     <div class="glass-card">
-      <h2>Connected Page</h2>
-      <div class="detail-item"><label>Page Name</label><span>${pageNameRow?.value || "Not connected"}</span></div>
-      <div class="detail-item"><label>Page ID</label><span>${pageIdRow?.value || "Not connected"}</span></div>
-      <div class="detail-item"><label>Status</label><span>${pageTokenRow?.value ? "Connected" : "Not connected"}</span></div>
-      ${pageTokenRow?.value ? `<a href="/auth/facebook/disconnect" class="btn btn-danger" style="margin-top: 1rem;">Disconnect</a>` : `<a href="/auth/facebook" class="btn btn-primary" style="margin-top: 1rem;">Connect Facebook</a>`}
+      <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Connected Page</h2>
+      
+      <div class="detail-item">
+        <label>Page Name</label>
+        <span id="page-name">${pageNameRow?.value || "Not connected"}</span>
+      </div>
+      
+      <div class="detail-item">
+        <label>Page ID</label>
+        <span id="page-id">${pageIdRow?.value || "Not connected"}</span>
+      </div>
+      
+      <div class="detail-item">
+        <label>Status</label>
+        <span id="page-status">${pageTokenRow?.value ? "Connected" : "Not connected"}</span>
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        ${pageTokenRow?.value ? `<a href="/auth/facebook/disconnect" class="btn btn-danger">Disconnect Facebook</a>` : `<a href="/auth/facebook" class="btn btn-primary">Connect Facebook</a>`}
+      </div>
     </div>
   </div>
 </body>
 </html>`;
 
-    return new Response(html, { headers: { "Content-Type": "text/html" } });
+      return new Response(html, { headers: { "Content-Type": "text/html" } });
+    } catch (error: any) {
+      console.error("Admin page error:", error);
+      return new Response(`<html><body><h1>Error loading admin page</h1><p>${error.message}</p><pre>${error.stack}</pre></body></html>`, { status: 500, headers: { "Content-Type": "text/html" } });
+    }
   }
 
   if (path === "/auth/facebook/disconnect" && method === "GET") {
