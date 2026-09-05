@@ -62,8 +62,11 @@
         };
 
         eventSource.onerror = function() {
-            document.getElementById('status-text').textContent = 'Connection lost. Retrying...';
-            document.getElementById('status-indicator').className = 'status-indicator degraded';
+            const statusText = document.getElementById('status-text');
+            if (statusText && statusText.textContent === 'Loading...') {
+                statusText.textContent = 'No backend connected';
+                document.getElementById('status-indicator').className = 'status-indicator degraded';
+            }
         };
 
         async function updateStatus(data) {

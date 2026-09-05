@@ -145,65 +145,90 @@
         let reportLayer = null;
 
         async function loadMap() {
+            let municipalities = null;
+            let outageAreas = [];
+            let reports = [];
+
             try {
-                const [areasRes, outagesRes, reportsRes] = await Promise.all([
-                     fetch('/geojson/municipalities.geojson'),
-                    fetch(`${API_BASE}/map/status`),
-                    fetch(`${API_BASE}/map/reports`)
-                ]);
+                const areasRes = await fetch('/geojson/municipalities.geojson');
+                if (areasRes.ok) {
+                    municipalities = await areasRes.json();
+                }
+            } catch (e) {
+                console.error('Failed to load GeoJSON:', e);
+            }
 
-                const municipalities = await areasRes.json();
-                const outageAreas = await outagesRes.json();
-                const reports = await reportsRes.json();
+            try {
+                const outagesRes = await fetch(`${API_BASE}/map/status`);
+                if (outagesRes.ok) {
+                    outageAreas = await outagesRes.json();
+                }
+            } catch (e) {
+                console.error('Failed to load outage status:', e);
+            }
 
-                if (municipalityLayer) map.removeLayer(municipalityLayer);
-                if (outageMarkerLayer) map.removeLayer(outageMarkerLayer);
-                if (reportLayer) map.removeLayer(reportLayer);
+            try {
+                const reportsRes = await fetch(`${API_BASE}/map/reports`);
+                if (reportsRes.ok) {
+                    reports = await reportsRes.json();
+                }
+            } catch (e) {
+                console.error('Failed to load reports:', e);
+            }
 
-                injectOutagePatterns();
+            if (!municipalities) {
+                console.error('No GeoJSON data available');
+                return;
+            }
 
-                const outageAreaMap = new Map(outageAreas.map(a => [a.area_name, a]));
+            if (municipalityLayer) map.removeLayer(municipalityLayer);
+            if (outageMarkerLayer) map.removeLayer(outageMarkerLayer);
+            if (reportLayer) map.removeLayer(reportLayer);
 
-                municipalityLayer = L.geoJSON(municipalities, {
-                    style: function(feature) {
-                        const name = feature.properties.name;
-                        const outage = outageAreaMap.get(name);
-                        if (outage && statusColors[outage.status]) {
-                            const c = statusColors[outage.status];
-                            const patternId = outage.status === 'restoring' ? 'url(#restoring-pattern)' : 'url(#outage-pattern)';
-                            return {
-                                fillColor: patternId,
-                                fillOpacity: 1,
-                                weight: 2,
-                                opacity: 0.8,
-                                color: c.stroke,
-                                dashArray: outage.status === 'restoring' ? '5, 5' : null
-                            };
-                        }
+            injectOutagePatterns();
+
+            const outageAreaMap = new Map(outageAreas.map(a => [a.area_name, a]));
+
+            municipalityLayer = L.geoJSON(municipalities, {
+                style: function(feature) {
+                    const name = feature.properties.name;
+                    const outage = outageAreaMap.get(name);
+                    if (outage && statusColors[outage.status]) {
+                        const c = statusColors[outage.status];
+                        const patternId = outage.status === 'restoring' ? 'url(#restoring-pattern)' : 'url(#outage-pattern)';
                         return {
-                            fillColor: 'rgba(148, 163, 184, 0.05)',
-                            weight: 1,
-                            opacity: 0.25,
-                            color: '#64748b',
-                            fillOpacity: 0.05
+                            fillColor: patternId,
+                            fillOpacity: 1,
+                            weight: 2,
+                            opacity: 0.8,
+                            color: c.stroke,
+                            dashArray: outage.status === 'restoring' ? '5, 5' : null
                         };
-                    },
-                    onEachFeature: function(feature, layer) {
-                        const name = feature.properties.name;
-                        const outage = outageAreaMap.get(name);
-                        let popup = `<strong>${name}</strong><br>${feature.properties.area_type}`;
-                        if (outage) {
-                            popup += `<br><br><strong>${statusLabels[outage.status] || outage.status}</strong>`;
-                            popup += `<br>Confidence: ${Math.round((outage.confidence || 0) * 100)}%`;
-                            popup += `<br>Reports: ${outage.report_count || 0}`;
-                            popup += `<br>Started: ${formatPHT(outage.started_at)}`;
-                            if (outage.restored_at) {
-                                popup += `<br>Restored: ${formatPHT(outage.restored_at)}`;
-                            }
-                        }
-                        layer.bindPopup(popup);
                     }
-                }).addTo(map);
+                    return {
+                        fillColor: 'rgba(148, 163, 184, 0.05)',
+                        weight: 1,
+                        opacity: 0.25,
+                        color: '#64748b',
+                        fillOpacity: 0.05
+                    };
+                },
+                onEachFeature: function(feature, layer) {
+                    const name = feature.properties.name;
+                    const outage = outageAreaMap.get(name);
+                    let popup = `<strong>${name}</strong><br>${feature.properties.area_type}`;
+                    if (outage) {
+                        popup += `<br><br><strong>${statusLabels[outage.status] || outage.status}</strong>`;
+                        popup += `<br>Confidence: ${Math.round((outage.confidence || 0) * 100)}%`;
+                        popup += `<br>Reports: ${outage.report_count || 0}`;
+                        popup += `<br>Started: ${formatPHT(outage.started_at)}`;
+                        if (outage.restored_at) {
+                            popup += `<br>Restored: ${formatPHT(outage.restored_at)}`;
+                        }
+                    }
+                    layer.bindPopup(popup);
+                }
+            }).addTo(map);
 
                 const outageMarkers = [];
                 for (const outage of outageAreas) {
