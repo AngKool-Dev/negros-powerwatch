@@ -52,7 +52,7 @@
             resultDiv.innerHTML = '<p style="color: var(--text-secondary);">Processing...</p>';
 
             try {
-                const response = await fetch(`${API_BASE}/admin/facebook/process-post`, {
+                const response = await fetch('/admin/facebook/process-post', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url, source_name: source })
