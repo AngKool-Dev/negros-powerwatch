@@ -147,7 +147,7 @@
         async function loadMap() {
             try {
                 const [areasRes, outagesRes, reportsRes] = await Promise.all([
-                    fetch('/static/geojson/municipalities.geojson'),
+                     fetch('/geojson/municipalities.geojson'),
                     fetch(`${API_BASE}/map/status`),
                     fetch(`${API_BASE}/map/reports`)
                 ]);
