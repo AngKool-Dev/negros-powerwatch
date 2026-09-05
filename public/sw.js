@@ -34,6 +34,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    if (request.headers.get('accept')?.includes('text/html')) {
+        event.respondWith(fetch(request));
+        return;
+    }
+
     event.respondWith(
         caches.match(request).then((cached) => {
             const fetchPromise = fetch(request).then((response) => {
