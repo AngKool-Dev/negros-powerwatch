@@ -234,8 +234,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return jsonResponse({ error: "Missing code" }, 400);
     }
 
-    const appId = (env as any).FACEBOOK_APP_ID || "1608618164211971";
-    const appSecret = (env as any).FACEBOOK_APP_SECRET || "";
+    const appId = (env as any).FACEBOOK_APP_ID;
+    const appSecret = (env as any).FACEBOOK_APP_SECRET;
+    if (!appId || !appSecret) {
+      return new Response("Facebook OAuth is not configured. Set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in Worker settings.", { status: 500, headers: corsHeaders });
+    }
     const redirectUri = `${url.origin}/auth/facebook/callback`;
 
     const tokenRes = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${appSecret}&code=${code}`, { method: "GET" });
