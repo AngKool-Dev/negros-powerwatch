@@ -285,41 +285,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     return response;
   }
 
+  if (path === "/auth/facebook" && method === "GET") {
+    return new Response("Facebook Login is temporarily unavailable. The app is not yet configured for production OAuth.", { status: 503, headers: corsHeaders });
+  }
+
+  if (path === "/auth/facebook/callback" && method === "GET") {
+    return new Response("Facebook Login is temporarily unavailable.", { status: 503, headers: corsHeaders });
+  }
+
   if (path === "/admin/facebook" && method === "GET") {
-    try {
-      const cookie = request.headers.get("cookie") || "";
-      const match = cookie.match(/npw_fb_user=([^;]+)/);
-      const sessionUserId = match ? match[1] : null;
-      const allowedUserId = (env as any).FACEBOOK_ALLOWED_USER_ID;
-
-      if (!sessionUserId || (allowedUserId && allowedUserId !== sessionUserId)) {
-        const authUrl = new URL("/auth/facebook", url.origin);
-        return Response.redirect(authUrl.toString(), 302);
-      }
-
-      let pageIdRow: any = null;
-      let pageNameRow: any = null;
-      let pageTokenRow: any = null;
-
-      try {
-        pageIdRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_id'").first();
-      } catch (e) {
-        console.error("Failed to query page_id:", e);
-      }
-
-      try {
-        pageNameRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_name'").first();
-      } catch (e) {
-        console.error("Failed to query page_name:", e);
-      }
-
-      try {
-        pageTokenRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'facebook_page_access_token'").first();
-      } catch (e) {
-        console.error("Failed to query page_token:", e);
-      }
-
-      const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html>
 <head>
   <title>Facebook Admin - Negros PowerWatch</title>
@@ -332,42 +307,31 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       <p class="subtitle">Facebook Integration Admin</p>
     </header>
     <div class="glass-card">
-      <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Connected Page</h2>
-      
+      <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem;">Status</h2>
       <div class="detail-item">
-        <label>Page Name</label>
-        <span id="page-name">${pageNameRow?.value || "Not connected"}</span>
+        <label>Facebook OAuth</label>
+        <span style="color: var(--warning);">Temporarily unavailable</span>
       </div>
-      
       <div class="detail-item">
-        <label>Page ID</label>
-        <span id="page-id">${pageIdRow?.value || "Not connected"}</span>
+        <label>Reason</label>
+        <span>App is not yet configured for production OAuth on Meta's side.</span>
       </div>
-      
       <div class="detail-item">
-        <label>Status</label>
-        <span id="page-status">${pageTokenRow?.value ? "Connected" : "Not connected"}</span>
+        <label>Mock Mode</label>
+        <span style="color: var(--success);">Active</span>
       </div>
-
-      <div style="margin-top: 1.5rem;">
-        ${pageTokenRow?.value ? `<a href="/auth/facebook/disconnect" class="btn btn-danger">Disconnect Facebook</a>` : `<a href="/auth/facebook" class="btn btn-primary">Connect Facebook</a>`}
-      </div>
+      <p style="margin-top: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+        The system is running with mock data for demonstration. To enable real Facebook data, complete app configuration in the Meta Developer Dashboard.
+      </p>
     </div>
   </div>
 </body>
 </html>`;
-
-      return new Response(html, { headers: { "Content-Type": "text/html" } });
-    } catch (error: any) {
-      console.error("Admin page error:", error);
-      return new Response(`<html><body><h1>Error loading admin page</h1><p>${error.message}</p><pre>${error.stack}</pre></body></html>`, { status: 500, headers: { "Content-Type": "text/html" } });
-    }
+    return new Response(html, { headers: { "Content-Type": "text/html" } });
   }
 
   if (path === "/auth/facebook/disconnect" && method === "GET") {
-    await env.DB.prepare("DELETE FROM settings WHERE key IN ('facebook_page_access_token', 'facebook_page_id', 'facebook_page_name')").run();
-    const response = new Response(null, { status: 302, headers: { Location: "/admin/facebook", "Set-Cookie": "npw_fb_user=; Path=/; HttpOnly; Max-Age=0" } });
-    return response;
+    return new Response("Facebook Login is temporarily unavailable.", { status: 503, headers: corsHeaders });
   }
 
   return new Response("Not Found", { status: 404, headers: corsHeaders });
