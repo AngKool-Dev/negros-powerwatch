@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Facebook Post - Negros PowerWatch</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+            <p class="subtitle">Manually add a Facebook post for processing</p>
+        </header>
+
+        <div class="glass-card">
+            <form id="add-post-form">
+                <div class="form-group">
+                    <label for="post-url">Facebook Post URL or Text</label>
+                    <input type="text" id="post-url" placeholder="Paste Facebook post URL or copy-paste post text here" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="post-source">Source Name</label>
+                    <input type="text" id="post-source" placeholder="e.g., NORECO II, NGCP" value="Manual Entry">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large">Process Post</button>
+            </form>
+
+            <div id="result" style="margin-top: 1.5rem;"></div>
+        </div>
+
+        <div class="glass-card">
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">Recent Manual Entries</h2>
+            <div id="recent-posts">
+                <p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No manual entries yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/config.js?v=2"></script>
+    <script type="module">
+        const API_BASE = window.POWERWATCH_CONFIG?.API_BASE || '/api/v1';
+
+        document.getElementById('add-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('post-url').value.trim();
+            const source = document.getElementById('post-source').value.trim() || 'Manual Entry';
+            const resultDiv = document.getElementById('result');
+
+            resultDiv.innerHTML = '<p style="color: var(--text-secondary);">Processing...</p>';
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/facebook/process-post`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, source_name: source })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="report-result success">
+                            <strong>Post processed!</strong><br>
+                            Score: ${data.score || '?'} | Status: ${data.status || '?'} | Area: ${data.area || 'Unknown'}
+                        </div>
+                    `;
+                    document.getElementById('post-url').value = '';
+                    loadRecentPosts();
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="report-result error">
+                            <strong>Error:</strong> ${data.detail || 'Failed to process post'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="report-result error">
+                        <strong>Network error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        });
+
+        async function loadRecentPosts() {
+            try {
+                const response = await fetch(`${API_BASE}/signals?source_name=Manual Entry`);
+                if (response.ok) {
+                    const signals = await response.json();
+                    renderRecentPosts(signals.slice(0, 10));
+                }
+            } catch (error) {
+                console.error('Failed to load recent posts:', error);
+            }
+        }
+
+        function renderRecentPosts(signals) {
+            const container = document.getElementById('recent-posts');
+            if (!signals || signals.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No manual entries yet.</p>';
+                return;
+            }
+
+            container.innerHTML = signals.map(signal => {
+                const meta = typeof signal.metadata_json === 'string' ? JSON.parse(signal.metadata_json || '{}') : (signal.metadata_json || {});
+                const rawText = meta.raw_text || signal.metadata_json || '';
+                const timestamp = signal.timestamp ? new Date(signal.timestamp).toLocaleString() : 'Unknown';
+                const score = meta.score || '?';
+
+                return `
+                    <div class="outage-card" style="margin-bottom: 1rem;">
+                        <div class="outage-header">
+                            <span class="outage-status possible">Score: ${score}</span>
+                            <span style="font-size: 0.8rem; color: var(--text-secondary);">${timestamp}</span>
+                        </div>
+                        <p style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">"${escapeHtml(rawText.slice(0, 300))}${rawText.length > 300 ? '...' : ''}"</p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        loadRecentPosts();
+    </script>
+</body>
+</html>

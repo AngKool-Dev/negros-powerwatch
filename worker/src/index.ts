@@ -3,6 +3,7 @@ import { Outage, CommunityReport, GeographicArea, MapAreaStatus } from "./models
 import { CONFIG, getFacebookSources } from "./config";
 import { utcNow, generateId } from "./utils";
 import { ACTIVE_OUTAGE_STATUSES } from "./engine";
+import { scorePost, detectLocation } from "./providers/facebook";
 
 export interface Env {
   DB: D1Database;
@@ -293,6 +294,65 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     return new Response("Facebook Login is temporarily unavailable.", { status: 503, headers: corsHeaders });
   }
 
+  if (path === "/admin/facebook/add-post" && method === "GET") {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Add Facebook Post - Negros PowerWatch</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+      <p class="subtitle">Manually add a Facebook post for processing</p>
+    </header>
+    <div class="glass-card">
+      <form id="add-post-form">
+        <div class="form-group">
+          <label for="post-url">Facebook Post URL or Text</label>
+          <input type="text" id="post-url" placeholder="Paste Facebook post URL or copy-paste post text here" required>
+        </div>
+        <div class="form-group">
+          <label for="post-source">Source Name</label>
+          <input type="text" id="post-source" placeholder="e.g., NORECO II, NGCP" value="Manual Entry">
+        </div>
+        <button type="submit" class="btn btn-primary btn-large">Process Post</button>
+      </form>
+      <div id="result" style="margin-top: 1.5rem;"></div>
+    </div>
+  </div>
+  <script>
+    const API_BASE = "/api/v1";
+    document.getElementById("add-post-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const url = document.getElementById("post-url").value.trim();
+      const source = document.getElementById("post-source").value.trim() || "Manual Entry";
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerHTML = "<p style=\"color: var(--text-secondary);\">Processing...</p>";
+      try {
+        const response = await fetch(API_BASE + "/admin/facebook/process-post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, source_name: source })
+        });
+        const data = await response.json();
+        if (response.ok) {
+          resultDiv.innerHTML = "<div class=\"report-result success\"><strong>Post processed!</strong><br>Score: " + (data.score || "?") + " | Status: " + (data.status || "?") + " | Area: " + (data.area || "Unknown") + "</div>";
+          document.getElementById("post-url").value = "";
+        } else {
+          resultDiv.innerHTML = "<div class=\"report-result error\"><strong>Error:</strong> " + (data.detail || "Failed") + "</div>";
+        }
+      } catch (error) {
+        resultDiv.innerHTML = "<div class=\"report-result error\"><strong>Network error:</strong> " + error.message + "</div>";
+      }
+    });
+  </script>
+</body>
+</html>`;
+    return new Response(html, { headers: { "Content-Type": "text/html" } });
+  }
+
   if (path === "/admin/facebook" && method === "GET") {
     const html = `<!DOCTYPE html>
 <html>
@@ -332,6 +392,66 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
   if (path === "/auth/facebook/disconnect" && method === "GET") {
     return new Response("Facebook Login is temporarily unavailable.", { status: 503, headers: corsHeaders });
+  }
+
+  if (path === "/admin/facebook/process-post" && method === "POST") {
+    try {
+      const body = await request.json() as any;
+      const rawText = body.url || body.text || "";
+      const sourceName = body.source_name || "Manual Entry";
+
+      if (!rawText) {
+        return jsonResponse({ error: "Missing url or text" }, 400);
+      }
+
+      let postText = rawText;
+      let postUrl = rawText;
+
+      if (rawText.includes("facebook.com") || rawText.includes("fb.watch")) {
+        postUrl = rawText;
+        try {
+          const urlObj = new URL(rawText);
+          const pathParts = urlObj.pathname.split("/").filter(Boolean);
+          const postId = pathParts[pathParts.length - 1];
+          if (postId && !isNaN(Number(postId))) {
+            postText = `Manual import from ${rawText}`;
+          }
+        } catch {
+          postText = rawText;
+        }
+      }
+
+      const { score, isRestoration, isPlanned } = scorePost(postText);
+      const { area } = detectLocation(postText);
+
+      const sourceStmt = env.DB.prepare("SELECT id FROM sources WHERE name = ? LIMIT 1");
+      const sourceRow = await sourceStmt.bind(sourceName).first() as any;
+      let sourceId = sourceRow?.id;
+      if (!sourceId) {
+        sourceId = generateId();
+        const now = utcNow();
+        await env.DB.prepare("INSERT INTO sources (id, name, source_type, reliability, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .bind(sourceId, sourceName, "community", 0.8, "unknown", now, now).run();
+      }
+
+      let areaId = null;
+      if (area) {
+        const areaStmt = env.DB.prepare("SELECT id FROM geographic_areas WHERE name LIKE ? AND area_type = 'municipality' LIMIT 1");
+        const areaRow = await areaStmt.bind(`%${area}%`).first();
+        areaId = areaRow?.id || null;
+      }
+
+      const signalId = generateId();
+      const confidence = Math.min(0.95, Math.max(0.2, score / 15));
+      const status = isRestoration ? "restored" : isPlanned ? "planned" : "out";
+
+      await env.DB.prepare("INSERT INTO signals (id, source_id, signal_type, timestamp, area_id, status, confidence, metadata_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(signalId, sourceId, "manual", utcNow(), areaId, status, confidence, JSON.stringify({ raw_text: postText.slice(0, 1000), score, source_url: postUrl, source_name: sourceName, author: "Manual Entry" }), utcNow()).run();
+
+      return jsonResponse({ id: signalId, score, status, area, confidence, source_name: sourceName });
+    } catch (error: any) {
+      return jsonResponse({ error: error.message }, 500);
+    }
   }
 
   return new Response("Not Found", { status: 404, headers: corsHeaders });
