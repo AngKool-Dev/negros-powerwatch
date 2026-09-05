@@ -1,0 +1,18 @@
+{
+  "name": "negros-powerwatch-worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute powerwatch-db --local",
+    "db:remote": "wrangler d1 execute powerwatch-db --remote"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "wrangler": "^3.99.0",
+    "typescript": "^5.7.0"
+  }
+}

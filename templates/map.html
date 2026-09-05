@@ -145,17 +145,29 @@
         let reportLayer = null;
 
         async function loadMap() {
+            console.log('Loading map...');
             let municipalities = null;
             let outageAreas = [];
             let reports = [];
 
             try {
+                console.log('Fetching GeoJSON...');
                 const areasRes = await fetch('/geojson/municipalities.geojson');
+                console.log('GeoJSON response status:', areasRes.status);
                 if (areasRes.ok) {
                     municipalities = await areasRes.json();
+                    console.log('GeoJSON loaded, features:', municipalities.features?.length);
+                } else {
+                    console.error('GeoJSON fetch failed:', areasRes.status, areasRes.statusText);
                 }
             } catch (e) {
-                console.error('Failed to load GeoJSON:', e);
+                console.error('GeoJSON fetch error:', e);
+            }
+
+            if (!municipalities) {
+                console.error('No GeoJSON data available, map cannot render borders');
+                document.getElementById('map').innerHTML = '<p style="padding: 20px; text-align: center;">Map data unavailable. Please check that /geojson/municipalities.geojson exists.</p>';
+                return;
             }
 
             try {
@@ -174,11 +186,6 @@
                 }
             } catch (e) {
                 console.error('Failed to load reports:', e);
-            }
-
-            if (!municipalities) {
-                console.error('No GeoJSON data available');
-                return;
             }
 
             if (municipalityLayer) map.removeLayer(municipalityLayer);
@@ -229,6 +236,8 @@
                     layer.bindPopup(popup);
                 }
             }).addTo(map);
+
+            console.log('Municipality layer added, features:', municipalityLayer.getLayers().length);
 
                 const outageMarkers = [];
                 for (const outage of outageAreas) {
