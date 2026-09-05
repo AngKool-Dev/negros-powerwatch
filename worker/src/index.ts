@@ -161,6 +161,17 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     return jsonResponse(status);
   }
 
+  if (path === "/signals" && method === "GET") {
+    const html = `<!DOCTYPE html><html><head><title>Signals</title></head><body><h1>Signals page - use Cloudflare Pages</h1><a href="/">Home</a></body></html>`;
+    return new Response(html, { headers: { "Content-Type": "text/html" } });
+  }
+
+  if (path === "/api/v1/signals" && method === "GET") {
+    const stmt = env.DB.prepare("SELECT * FROM signals ORDER BY created_at DESC LIMIT 100");
+    const { results } = await stmt.all();
+    return jsonResponse(results);
+  }
+
   if (path === "/api/v1/map/reports" && method === "GET") {
     const stmt = env.DB.prepare(
       "SELECT id, latitude, longitude, timestamp, area_id, municipality, barangay FROM community_reports WHERE power_status IN ('out', 'off')"
@@ -227,3 +238,13 @@ export default {
     }
   },
 };
+
+async function readTemplate(name: string): Promise<string> {
+  const path = name.startsWith("/") ? name : `templates/${name}`;
+  try {
+    const file = await import(path);
+    return file.default || file;
+  } catch {
+    return `<html><body><h1>Template not found: ${path}</h1></body></html>`;
+  }
+}

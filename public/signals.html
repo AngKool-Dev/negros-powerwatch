@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Signals - Negros PowerWatch</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><a href="/">⚡ Negros PowerWatch</a></h1>
+            <p class="subtitle">Latest Facebook Signals from NORECO II & NGCP</p>
+        </header>
+
+        <div class="glass-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="font-size: 1.25rem; font-weight: 700;">Raw Signals Feed</h2>
+                <button onclick="loadSignals()" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                    Refresh
+                </button>
+            </div>
+            <div id="signals-list">
+                <p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Loading signals...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/config.js?v=2"></script>
+    <script type="module">
+        import { formatPHTDateTime } from '/js/timezone.js';
+
+        const API_BASE = window.POWERWATCH_CONFIG?.API_BASE || '/api/v1';
+
+        async function loadSignals() {
+            const list = document.getElementById('signals-list');
+            list.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Loading...</p>';
+
+            try {
+                const [signalsRes, statusRes] = await Promise.all([
+                    fetch(`${API_BASE}/signals`),
+                    fetch(`${API_BASE}/status`)
+                ]);
+
+                if (!signalsRes.ok) {
+                    throw new Error(`Signals API returned ${signalsRes.status}`);
+                }
+
+                const signals = await signalsRes.json();
+                const status = await statusRes.json();
+
+                if (status.outages && status.outages.length > 0) {
+                    const outageIds = new Set(status.outages.map(o => o.id));
+                    const activeSignals = signals.filter(s => outageIds.has(s.outage_id));
+                    renderSignals(activeSignals, list);
+                } else {
+                    renderSignals(signals, list);
+                }
+            } catch (error) {
+                console.error('Failed to load signals:', error);
+                list.innerHTML = `<p style="text-align: center; color: var(--danger); padding: 2rem;">Failed to load signals: ${error.message}</p>`;
+            }
+        }
+
+        function renderSignals(signals, container) {
+            if (!signals || signals.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No signals found. Run a scan to collect Facebook posts.</p>';
+                return;
+            }
+
+            const sorted = [...signals].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            container.innerHTML = sorted.map(signal => {
+                const meta = typeof signal.metadata_json === 'string' ? JSON.parse(signal.metadata_json || '{}') : (signal.metadata_json || {});
+                const sourceName = meta.source_name || signal.source_id || 'Unknown';
+                const author = meta.author || 'Unknown';
+                const score = meta.score || '?';
+                const rawText = meta.raw_text || signal.metadata_json || '';
+                const sourceUrl = meta.source_url || '#';
+                const timestamp = signal.timestamp ? formatPHTDateTime(signal.timestamp) : 'Unknown';
+                const status = signal.status || 'unknown';
+                const confidence = signal.confidence ? Math.round(signal.confidence * 100) : '?';
+
+                let statusClass = 'possible';
+                if (status === 'out') statusClass = 'community_confirmed';
+                else if (status === 'restored') statusClass = 'restored';
+                else if (status === 'planned') statusClass = 'restoring';
+
+                return `
+                    <div class="outage-card" style="margin-bottom: 1rem;">
+                        <div class="outage-header">
+                            <span class="outage-status ${statusClass}">${status}</span>
+                            <span style="font-size: 0.8rem; color: var(--text-secondary);">${timestamp}</span>
+                        </div>
+                        <div style="margin-bottom: 0.75rem;">
+                            <p style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">"${escapeHtml(rawText.slice(0, 300))}${rawText.length > 300 ? '...' : ''}"</p>
+                            <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-secondary);">
+                                <span><strong>Source:</strong> ${escapeHtml(sourceName)}</span>
+                                <span><strong>Author:</strong> ${escapeHtml(author)}</span>
+                                <span><strong>Score:</strong> ${score}</span>
+                                <span><strong>Confidence:</strong> ${confidence}%</span>
+                            </div>
+                        </div>
+                        <a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; display: inline-flex;">
+                            View Original Post →
+                        </a>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+                registrations.forEach((reg) => reg.unregister());
+            }).then(() => {
+                return navigator.serviceWorker.register('/sw-v2.js');
+            });
+        }
+
+        loadSignals();
+        setInterval(loadSignals, 30000);
+    </script>
+</body>
+</html>
