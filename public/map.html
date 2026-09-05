@@ -100,7 +100,7 @@
         }
 
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
+            navigator.serviceWorker.register('/sw.js?v=2');
         }
 
         const API_BASE = window.POWERWATCH_CONFIG?.API_BASE || '/api/v1';
