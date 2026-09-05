@@ -56,21 +56,37 @@ async function ensureInitialized(db: D1Database): Promise<void> {
   initialized = true;
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 async function handleRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
 
+  if (method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   const service = new ReportService(env.DB);
   await ensureInitialized(env.DB);
 
-  if (method === "OPTIONS") {
-    return new Response(null, { status: 204 });
-  }
+  const jsonResponse = (body: any, status = 200) => {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    });
+  };
 
   if (path === "/api/v1/status" && method === "GET") {
     const data = await service.getStatus();
-    return Response.json({
+    return jsonResponse({
       status: data.status,
       active_outages: data.active_outages,
       last_updated: data.last_updated,
@@ -80,12 +96,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
   if (path === "/api/v1/outages" && method === "GET") {
     const outages = await service.getActiveOutages();
-    return Response.json(outages);
+    return jsonResponse(outages);
   }
 
   if (path === "/api/v1/outages/active" && method === "GET") {
     const outages = await service.getActiveOutages();
-    return Response.json(outages);
+    return jsonResponse(outages);
   }
 
   const outageMatch = path.match(/^\/api\/v1\/outages\/([^\/]+)$/);
@@ -93,9 +109,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     const outageId = outageMatch[1];
     const outage = await service.getOutageById(outageId);
     if (!outage) {
-      return new Response(JSON.stringify({ detail: "Outage not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      return jsonResponse({ detail: "Outage not found" }, 404);
     }
-    return Response.json(outage);
+    return jsonResponse(outage);
   }
 
   if (path === "/api/v1/reports" && method === "POST") {
@@ -105,33 +121,33 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     body.session_id = body.session_id || clientHost ? `anon-${clientHost}` : "anonymous";
     const result = await service.submitReport(body);
     if (result.status === "duplicate") {
-      return new Response(JSON.stringify({ detail: "Duplicate report" }), { status: 429, headers: { "Content-Type": "application/json" } });
+      return jsonResponse({ detail: "Duplicate report" }, 429);
     }
-    return Response.json(result);
+    return jsonResponse(result);
   }
 
   if (path === "/api/v1/reports/power-off" && method === "POST") {
     const body = await request.json().catch(() => ({}));
     body.power_status = "off";
     const result = await service.submitReport(body);
-    return Response.json(result);
+    return jsonResponse(result);
   }
 
   if (path === "/api/v1/reports/power-restored" && method === "POST") {
     const body = await request.json().catch(() => ({}));
     body.power_status = "restored";
     const result = await service.submitReport(body);
-    return Response.json(result);
+    return jsonResponse(result);
   }
 
   if (path === "/api/v1/scan" && method === "POST") {
     const result = await service.scanSources();
-    return Response.json(result);
+    return jsonResponse(result);
   }
 
   if (path === "/api/v1/admin/facebook/status" && method === "GET") {
     const status = await service.getFacebookStatus();
-    return Response.json(status);
+    return jsonResponse(status);
   }
 
   if (path === "/api/v1/map/reports" && method === "GET") {
@@ -139,7 +155,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       "SELECT id, latitude, longitude, timestamp, area_id, municipality, barangay FROM community_reports WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND power_status = 'out'"
     );
     const { results } = await stmt.all();
-    return Response.json(results);
+    return jsonResponse(results);
   }
 
   if (path === "/api/v1/map/status" && method === "GET") {
@@ -166,7 +182,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         }
       }
     }
-    return Response.json(Array.from(areaMap.values()));
+    return jsonResponse(Array.from(areaMap.values()));
   }
 
   if (path === "/api/v1/events" && method === "GET") {
@@ -176,11 +192,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
+        ...corsHeaders,
       },
     });
   }
 
-  return new Response("Not Found", { status: 404 });
+  return new Response("Not Found", { status: 404, headers: corsHeaders });
 }
 
 export default {
