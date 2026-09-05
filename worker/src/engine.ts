@@ -377,6 +377,13 @@ export class OutageEngine {
     const signals = sigResult.results as Signal[];
     const hasOfficial = signals.some((s) => s.signal_type === "official_advisory");
 
+    if (["possible", "community_confirmed", "officially_confirmed", "detected"].includes(outage.status)) {
+      if (outage.restored_at !== null) {
+        outage.status = "restoring";
+        await this.logEvent("OUTAGE_RESTORING", outage);
+      }
+    }
+
     if (outage.status === "possible") {
       if (outage.report_count >= CONFIG.reportMinReports || hasOfficial) {
         outage.status = hasOfficial ? "officially_confirmed" : "detected";
@@ -384,6 +391,8 @@ export class OutageEngine {
         if (hasOfficial) outage.official_confirmed_at = now;
         await this.logEvent("OUTAGE_DETECTED", outage);
       } else {
+        const updateStmt = this.db.prepare("UPDATE outages SET status = ?, updated_at = ? WHERE id = ?");
+        await updateStmt.bind(outage.status, now, outage.id).run();
         return;
       }
     }
@@ -393,13 +402,6 @@ export class OutageEngine {
         outage.status = hasOfficial ? "officially_confirmed" : "community_confirmed";
         if (hasOfficial) outage.official_confirmed_at = now;
         await this.logEvent("OUTAGE_COMMUNITY_CONFIRMED", outage);
-      }
-    }
-
-    if (["possible", "community_confirmed", "officially_confirmed", "detected"].includes(outage.status)) {
-      if (outage.restored_at !== null) {
-        outage.status = "restoring";
-        await this.logEvent("OUTAGE_RESTORING", outage);
       }
     }
 
