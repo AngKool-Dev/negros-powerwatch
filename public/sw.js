@@ -1,4 +1,4 @@
-const CACHE_NAME = 'negros-powerwatch-v1';
+const CACHE_NAME = 'negros-powerwatch-v2';
 const STATIC_ASSETS = [
     '/',
     '/css/style.css',
