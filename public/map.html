@@ -92,7 +92,12 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
      <script type="module">
-         import { formatPHT, formatPHTTime } from '/js/timezone.js';
+        import { formatPHT, formatPHTTime } from '/js/timezone.js';
+
+        if (typeof L === 'undefined') {
+            document.getElementById('map').innerHTML = '<p style="padding: 20px; text-align: center;">Failed to load Leaflet map library. Please check your internet connection.</p>';
+            throw new Error('Leaflet library not loaded');
+        }
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
@@ -213,11 +218,11 @@
                         };
                     }
                     return {
-                        fillColor: 'rgba(148, 163, 184, 0.05)',
-                        weight: 1,
-                        opacity: 0.25,
+                        fillColor: 'rgba(148, 163, 184, 0.15)',
+                        weight: 2,
+                        opacity: 0.8,
                         color: '#64748b',
-                        fillOpacity: 0.05
+                        fillOpacity: 0.15
                     };
                 },
                 onEachFeature: function(feature, layer) {
