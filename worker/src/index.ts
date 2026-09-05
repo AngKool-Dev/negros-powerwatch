@@ -162,9 +162,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     const outages = await service.getActiveOutages();
     const areaMap = new Map<string, MapAreaStatus>();
     for (const outage of outages) {
-      for (const oa of outage.areas || []) {
-        const areaStmt = env.DB.prepare("SELECT * FROM geographic_areas WHERE id = ?");
-        const area = await areaStmt.bind(oa.area_id).first();
+      const outageAreas = await env.DB.prepare("SELECT * FROM outage_areas WHERE outage_id = ?").bind(outage.id).all();
+      const areas = (outageAreas.results || []) as any[];
+      for (const oa of areas) {
+        const area = await env.DB.prepare("SELECT * FROM geographic_areas WHERE id = ?").bind(oa.area_id).first();
         if (!area) continue;
         const key = area.id;
         if (!areaMap.has(key)) {
