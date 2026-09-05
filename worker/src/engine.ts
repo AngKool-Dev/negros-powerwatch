@@ -396,7 +396,7 @@ export class OutageEngine {
       }
     }
 
-    if (["community_confirmed", "officially_confirmed", "detected"].includes(outage.status)) {
+    if (["possible", "community_confirmed", "officially_confirmed", "detected"].includes(outage.status)) {
       if (outage.restored_at !== null) {
         outage.status = "restoring";
         await this.logEvent("OUTAGE_RESTORING", outage);
