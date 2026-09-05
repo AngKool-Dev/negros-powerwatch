@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Negros PowerWatch</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="manifest" href="/static/manifest.json">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0f172a">
 </head>
 <body>
@@ -47,7 +47,7 @@
     </div>
 
     <script type="module">
-        import { formatPHT, formatPHTTime } from '/static/js/timezone.js';
+        import { formatPHT, formatPHTTime } from '/js/timezone.js';
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
